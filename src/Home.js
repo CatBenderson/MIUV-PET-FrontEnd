@@ -11,37 +11,40 @@ import {
   Stack,
   Grid,
   GridItem,
-  Icon
+  Icon,
+  Text
 } from '@chakra-ui/react'
-import { 
-  TbApple, 
-  TbBandage, 
-  TbBed, 
-  TbBuildingHospital, 
-  TbCake, 
-  TbCoffee, 
-  TbDeviceGamepad2, 
-  TbEggFried, 
-  TbFirstAidKit, 
-  TbMoonStars, 
-  TbPingPong, 
-  TbSkateboarding 
+import {
+  TbApple,
+  TbBandage,
+  TbBed,
+  TbBuildingHospital,
+  TbCake,
+  TbCoffee,
+  TbDeviceGamepad2,
+  TbEggFried,
+  TbFirstAidKit,
+  TbMoonStars,
+  TbPingPong,
+  TbSkateboarding
 } from "react-icons/tb";
-import { useEffect, useState } from 'react';
 import moment from 'moment/moment';
-import DrawerLogin from "./Drawer/DrawerLogin";
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from "react-router-dom";
+import * as PetServer from './Drawer/PetServer'
+
 import './Home.css';
 
 function Home() {
-  const [comida, setComida] = useState(100);
-  const [diversion, setDiversion] = useState(100);
-  const [salud, setSalud] = useState(100);
-  const [sueño, setSueño] = useState(100);
+  const history = useNavigate();
+  const location = useLocation();
   const [aux, setAux] = useState(0);
   const [sliderComidaValue, setSliderComidaValue] = useState(10);
   const [sliderDiversionValue, setSliderDiversionValue] = useState(10);
   const [sliderSaludValue, setSliderSaludValue] = useState(10);
   const [sliderSueñoValue, setSliderSueñoValue] = useState(10);
+  const [pet, setPet] = useState({ id: null, name: null, nickname: "", hunger: 0, energy: 0, health: 0, happiness: 0, account: null })
+
 
   const handleSliderComidaChange = (valor) => {
     setSliderComidaValue(valor);
@@ -56,66 +59,113 @@ function Home() {
     setSliderSueñoValue(valor);
   };
 
-  function verificarDecremento(variable, valor) {
-    if (valor > 0) {
-      variable((prev) => prev - 1);
+  async function verificarDecremento(variable) {
+    let aux = parseInt(pet[variable])
+    if (aux > 0) {
+      pet[variable] = aux - 1
+    }
+    try {
+      const dataPet = await(await PetServer.actualizarPet(location.state.pet.id, pet))
+    } catch (error) {
+      console.log(error);
     }
   }
 
-  function verificarAumento(setVariable, variable, cantidad) {
-    if (variable + cantidad >= 100) {
-      setVariable(100);
+  async function verificarAumento(cantidad, variable) {
+    let aux = parseInt(pet[variable]) + cantidad
+    if (aux >= 100) {
+      pet[variable] = 100
     } else {
-      setVariable((prev) => prev + cantidad)
+      pet[variable] = aux
+    }
+    try {
+      const dataPet = await (await PetServer.actualizarPet(location.state.pet.id, pet))
+    } catch (error) {
+      console.log(error);
     }
   }
 
   function añadirComida() {
-    verificarAumento(setComida, comida, sliderComidaValue);
+    verificarAumento(sliderComidaValue, "hunger");
+
   };
   function añadirDiversion() {
-    verificarAumento(setDiversion, diversion, sliderDiversionValue);
+    verificarAumento(sliderDiversionValue, "happiness");
   };
   function añadirSalud() {
-    verificarAumento(setSalud, salud, sliderSaludValue);
+    verificarAumento(sliderSaludValue, "health");
   };
   function añadirSueño() {
-    verificarAumento(setSueño, sueño, sliderSueñoValue);
+    verificarAumento(sliderSueñoValue, "energy");
   };
 
   function disminuir() {
-    verificarDecremento(setComida, comida);
-    verificarDecremento(setDiversion, diversion);
-    verificarDecremento(setSalud, salud);
-    verificarDecremento(setSueño, sueño);
+    verificarDecremento("hunger");
+    verificarDecremento("happiness");
+    verificarDecremento("health");
+    verificarDecremento("energy");
     setAux(aux + 1)
   }
+
+  function cerrarSesion() {
+    history("/")
+  }
+
+  async function inicializar() {
+    if(location.state.pet !=null){
+      const dataPet = await (await PetServer.getPetById(location.state.pet.id))
+      pet.account = dataPet.data[0].account
+      pet.energy = dataPet.data[0].energy
+      pet.happiness = dataPet.data[0].happiness
+      pet.health = dataPet.data[0].health
+      pet.hunger = dataPet.data[0].hunger
+      pet.id = dataPet.data[0].id
+      pet.name = dataPet.data[0].name
+      pet.nickname = dataPet.data[0].nickname
+    }else{
+      alert("No puedes acceder a esta página. Regístrate o inicia sesión");
+    }
+  }
+
+  useEffect(() => {
+    inicializar()
+  }, []);
 
   useEffect(() => {
     setTimeout(() => {
       disminuir()
+      if(pet.energy==0 && pet.happiness==0 && pet.health ==0 && pet.hunger==0){
+        alert("Luzio murió")
+        cerrarSesion()
+      }
     }, 2000);
   }, [aux]);
+
 
   return (
     <>
       <Box w="100%" p={4} ml={5}>
         <Heading className='encabezado'>MIUV PET</Heading>
-        <DrawerLogin />
+        <Button color='#2a7858' bgColor='#e0e7d7' m={1} onClick={cerrarSesion}>
+          Cerrar sesión
+        </Button>
+        <Text fontSize={'xl'} >
+          Tu mascota se llama:<b>{" " + pet.nickname}</b>
+        </Text>
       </Box>
       <Stack>
         <Box className='graficoPorcentaje' textAlign='center'>
-          <CircularProgress className='graficoPorcentaje' value={comida} color='#2A7858' size='12vh' thickness='18px'>
-            <CircularProgressLabel>{comida}%</CircularProgressLabel>
+          <CircularProgress className='graficoPorcentaje' value={pet.hunger} color='#2A7858' size='12vh' thickness='18px'>
+            <CircularProgressLabel>{pet.hunger}%</CircularProgressLabel>
           </CircularProgress>
-          <CircularProgress className='graficoPorcentaje' value={diversion} color='#FCD408' size='12vh' thickness='18px'>
-            <CircularProgressLabel>{diversion}%</CircularProgressLabel>
+          <CircularProgress className='graficoPorcentaje' value={pet.happiness} color='#FCD408' size='12vh' thickness='18px'>
+            <CircularProgressLabel>{pet.happiness}%</CircularProgressLabel>
           </CircularProgress>
-          <CircularProgress className='graficoPorcentaje' value={salud} color='#7494AC' size='12vh' thickness='18px'>
-            <CircularProgressLabel>{salud}%</CircularProgressLabel>
+          <CircularProgress className='graficoPorcentaje' value={pet.health} color='#7494AC' size='12vh' thickness='18px'>
+            <CircularProgressLabel>{pet.health}%</CircularProgressLabel>
           </CircularProgress>
-          <CircularProgress className='graficoPorcentaje' value={sueño} color='#7CBC74' size='12vh' thickness='18px'>
-            <CircularProgressLabel>{sueño}%</CircularProgressLabel>
+          <CircularProgress className='graficoPorcentaje' value={pet.energy} color='#7CBC74' size='12vh' thickness='18px'>
+            <CircularProgressLabel>{pet.energy}%</CircularProgressLabel>
           </CircularProgress>
         </Box>
         <Grid
@@ -280,7 +330,7 @@ function Home() {
             </Grid>
           </GridItem>
           <GridItem bgColor='black' colSpan={3} minHeight='67vh'>
-            <Heading>modelo luzio, apurate breayan</Heading>
+            <Heading>Modelo Luzio</Heading>
           </GridItem>
 
         </Grid>

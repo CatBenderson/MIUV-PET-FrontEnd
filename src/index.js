@@ -1,14 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import Home from './Home';
+import Start from './Start';
 import reportWebVitals from './reportWebVitals';
 import { ChakraProvider } from '@chakra-ui/react'
+import Home from './Home';
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <ChakraProvider>
-    <Home />
+    <BrowserRouter>
+      <Routes>
+        <Route exact path="/" element={<Start />} />
+        <Route exact path="/home" element={<Home />} />
+      </Routes>
+    </BrowserRouter>
+
   </ChakraProvider>
 );
 
