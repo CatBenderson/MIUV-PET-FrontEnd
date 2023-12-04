@@ -1,5 +1,6 @@
 import { Image, Center, Text, Box } from "@chakra-ui/react";
 import DrawerLogin from "./Drawer/DrawerLogin";
+import luzio from "./Assets/images/tulio.png"
 
 function Start() {
 
@@ -18,7 +19,7 @@ function Start() {
                     <Text fontSize='3xl'  position='relative' >Tendrás que hacerte cargo de sus necesidades</Text>
                     <Text fontSize='3xl'  position='relative' >Si no le das atención podría haber malos resultados</Text>
                 </Box>
-                <Image h='60vh' src='https://lh3.googleusercontent.com/drive-viewer/AK7aPaAn2fh6JbaMbuWL7ts2IzBtGustXC56KTsojiHk8oi1l3zHC2Q-Bnzh_maYWPjJ3pkUo4ByJQOKjf9e3FGtsvqPXIZw=w1321-h636' alt='Modelo Luzio' />
+                <Image h='60vh' src={luzio} alt='Modelo Luzio' />
             </Center>
         </>
     );

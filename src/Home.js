@@ -29,9 +29,19 @@ import {
   TbSkateboarding
 } from "react-icons/tb";
 import moment from 'moment/moment';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from "react-router-dom";
 import * as PetServer from './Drawer/PetServer'
+import * as THREE from "three";
+import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
+import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
+import background from "./Assets/images/Background2.jpg"
+import audioFondo from "./Assets/Music/songSRC.mp3"
+import soundComer from "./Assets/Music/Comer.mp3"
+import soundSaltar from "./Assets/Music/Saltar.mp3"
+import soundFlexionar from "./Assets/Music/Flexionar.mp3"
+import soundGirar from "./Assets/Music/Girar.mp3"
+import soundMorir from "./Assets/Music/Morir.mp3"
 
 import './Home.css';
 
@@ -45,7 +55,35 @@ function Home() {
   const [sliderSueñoValue, setSliderSueñoValue] = useState(10);
   const [pet, setPet] = useState({ id: null, name: null, nickname: "", hunger: 0, energy: 0, health: 0, happiness: 0, account: null })
 
+  const audioFondoRef = useRef(new Audio(audioFondo));
+  const [isPlayingAudioFondo, setIsPlayingAudioFondo] = useState(false);
+  const [currentSound, setCurrentSound] = useState(null)  
 
+  const sounds = [soundComer, soundSaltar, soundFlexionar, soundGirar, soundMorir]
+
+  const playSound = (index) =>{
+    if(currentSound){
+      currentSound.pause();
+      currentSound.currentTime = 0;
+    }
+    const newSound = new Audio(sounds[index]);
+    newSound.play();
+    setCurrentSound(newSound);
+  }
+
+  const handlerAudioFondo = () =>{    
+    if(!isPlayingAudioFondo){
+      audioFondoRef.current.play();
+      audioFondoRef.current.volume = 0.5;
+    }else{
+      audioFondoRef.current.pause();
+      audioFondoRef.current.currentTime = 0;
+    }
+    setIsPlayingAudioFondo(!isPlayingAudioFondo);
+  }
+
+  const mountRef = useRef(null);
+  
   const handleSliderComidaChange = (valor) => {
     setSliderComidaValue(valor);
   };
@@ -85,18 +123,21 @@ function Home() {
     }
   }
 
-  function añadirComida() {
+  function añadirComida() {    
     verificarAumento(sliderComidaValue, "hunger");
-
+    playSound(0);    
   };
   function añadirDiversion() {
     verificarAumento(sliderDiversionValue, "happiness");
+    playSound(1);
   };
   function añadirSalud() {
     verificarAumento(sliderSaludValue, "health");
+    playSound(2);
   };
   function añadirSueño() {
     verificarAumento(sliderSueñoValue, "energy");
+    playSound(3);
   };
 
   function disminuir() {
@@ -108,7 +149,7 @@ function Home() {
   }
 
   function cerrarSesion() {
-    history("/")
+    history("/")    
   }
 
   async function inicializar() {
@@ -130,30 +171,152 @@ function Home() {
   useEffect(() => {
     inicializar()
   }, []);
-
-  useEffect(() => {
-    setTimeout(() => {
+  
+  /*useEffect(() => {
+    setTimeout(async () => {
       disminuir()
       if(pet.energy==0 && pet.happiness==0 && pet.health ==0 && pet.hunger==0){
-        alert("Luzio murió")
-        cerrarSesion()
-      }
+        audioFondoRef.current.pause();
+        audioFondoRef.current.currentTime = 0;
+        setIsPlayingAudioFondo(!isPlayingAudioFondo);        
+        playSound(4);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        alert("Luzio murió");
+        cerrarSesion();
+      }      
     }, 2000);
-  }, [aux]);
+  }, [aux]);*/
 
+  useEffect(()=>{
+    const intervalo = setInterval(async ()=>{
+      disminuir()
+      if(pet.energy==0 && pet.happiness==0 && pet.health ==0 && pet.hunger==0){
+        audioFondoRef.current.pause();
+        audioFondoRef.current.currentTime = 0;
+        setIsPlayingAudioFondo(!isPlayingAudioFondo);        
+        playSound(4);        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        alert("Luzio murió");
+        cerrarSesion();
+      }
+    },1000)
+    return () =>{
+      clearInterval(intervalo)
+    }
+  },[aux])
+
+  useEffect(()=>{
+    let mixer, clips, action;
+
+    //Canvas
+    const currentRef = mountRef.current;
+    const {clientWidth: width, clientHeight: height} = currentRef;
+
+    //Escena, cámara y Renderizado
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(25, width/height, 0.1, 1000);
+    camera.position.z = 34;
+    camera.position.y = 5;
+    scene.add(camera);
+
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(width, height);
+    currentRef.appendChild(renderer.domElement);
+
+    //Controles Orbitales
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+
+    //Cambiar tamaño canvas
+    const resize = () =>{
+        renderer.setSize(currentRef.clientWidth, currentRef.clientHeight);
+        camera.aspect = currentRef.clientWidth / currentRef.clientHeight;
+        camera.updateProjectionMatrix();
+    };
+    window.addEventListener("resize", resize);
+
+    //Cargar Modelo
+    const personaje = new THREE.Group()
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load(
+        "./models/FinalModel.gltf",
+        (gltf)=>{
+          personaje.add(gltf.scene);
+          personaje.position.y = -5;
+          scene.add(personaje);
+          mixer = new THREE.AnimationMixer(gltf.scene);
+          clips = gltf.animations;                                  
+        }
+    )
+
+    //Animar la escena
+    const clock = new THREE.Clock();
+    const animate = () =>{
+        orbitControls.update();
+        if(mixer){
+            mixer.update(clock.getDelta());
+        }
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+        renderer.setClearColor( 0xffffff, 0);
+
+        //Parar la animación automáticamente
+        if(action){
+            if(action.time === action._clip.duration){
+                mixer.stopAllAction();                
+            }
+        }
+    };
+
+    //Luces del Modelo
+    const ambientalLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientalLight);
+    
+    var loader = new THREE.TextureLoader();
+    loader.load(background, function(texture) {
+      scene.background = texture
+    })
+    
+
+    //Función para activar una animación en específico
+    const startAnimation = (name) =>{
+        if(mixer){                                
+            mixer.stopAllAction();
+            const clip = THREE.AnimationClip.findByName(clips, name);
+            action = mixer.clipAction(clip);
+            action.setLoop(THREE.LoopOnce, 1);
+            action.play();
+        }
+    };    
+    document.getElementById('Comer').addEventListener('click', ()=>{startAnimation("Comer")})
+    document.getElementById('Saltar').addEventListener('click', ()=>{startAnimation("Saltar")})
+    document.getElementById('Flexionar').addEventListener('click', ()=>{startAnimation("Flexionar")})
+    document.getElementById('Girar').addEventListener('click', ()=>{startAnimation("Girar")})
+        
+    //Loop
+    animate();
+    
+    return () =>{
+        window.removeEventListener("resize", resize);
+        currentRef.removeChild(renderer.domElement);
+    };
+  },[]);
 
   return (
-    <>
-      <Box w="100%" p={4} ml={5}>
+    <>      
+      <Box w="-moz-max-content" h="1" p={4} ml={5}>
         <Heading className='encabezado'>MIUV PET</Heading>
         <Button color='#2a7858' bgColor='#e0e7d7' m={1} onClick={cerrarSesion}>
           Cerrar sesión
-        </Button>
+        </Button>        
         <Text fontSize={'xl'} >
           Tu mascota se llama:<b>{" " + pet.nickname}</b>
         </Text>
+        <Button color='#2a7858' bgColor='#e0e7d7' m={1} onClick={handlerAudioFondo}>
+          {isPlayingAudioFondo ? 'Desactivar Música' : 'Activar Música'}
+        </Button>
       </Box>
-      <Stack>
+      <Stack marginTop="10">
         <Box className='graficoPorcentaje' textAlign='center'>
           <CircularProgress className='graficoPorcentaje' value={pet.hunger} color='#2A7858' size='12vh' thickness='18px'>
             <CircularProgressLabel>{pet.hunger}%</CircularProgressLabel>
@@ -198,9 +361,9 @@ function Home() {
                     <Slider
                       value={sliderComidaValue}
                       onChange={handleSliderComidaChange}
-                      min={5}
-                      max={15}
-                      step={5}
+                      min={2}
+                      max={6}
+                      step={2}
                       w='60%'>
                       <SliderTrack bg='#e0e7d7' >
                         <Box position='relative' right={10} />
@@ -210,7 +373,7 @@ function Home() {
                     </Slider>
                   </GridItem>
                   <GridItem>
-                    <Button onClick={añadirComida}>
+                    <Button id="Comer" onClick={añadirComida}>
                       Añadir comida
                     </Button>
                   </GridItem>
@@ -247,7 +410,7 @@ function Home() {
                     </Slider>
                   </GridItem>
                   <GridItem>
-                    <Button onClick={añadirDiversion}>
+                    <Button id="Saltar" onClick={añadirDiversion}>
                       Añadir diversión
                     </Button>
                   </GridItem>
@@ -272,9 +435,9 @@ function Home() {
                     <Slider
                       value={sliderSaludValue}
                       onChange={handleSliderSaludChange}
-                      min={5}
-                      max={15}
-                      step={5}
+                      min={4}
+                      max={12}
+                      step={3}
                       w='60%'>
                       <SliderTrack bg='#e0e7d7' >
                         <Box position='relative' right={10} />
@@ -284,7 +447,7 @@ function Home() {
                     </Slider>
                   </GridItem>
                   <GridItem>
-                    <Button onClick={añadirSalud}>
+                    <Button id="Flexionar" onClick={añadirSalud}>
                       Añadir salud
                     </Button>
                   </GridItem>
@@ -309,9 +472,9 @@ function Home() {
                     <Slider
                       value={sliderSueñoValue}
                       onChange={handleSliderSueñoChange}
-                      min={5}
-                      max={15}
-                      step={5}
+                      min={3}
+                      max={9}
+                      step={3}
                       w='60%'>
                       <SliderTrack bg='#e0e7d7' >
                         <Box position='relative' right={10} />
@@ -321,7 +484,7 @@ function Home() {
                     </Slider>
                   </GridItem>
                   <GridItem>
-                    <Button onClick={añadirSueño}>
+                    <Button id="Girar" onClick={añadirSueño}>
                       Añadir sueño
                     </Button>
                   </GridItem>
@@ -329,10 +492,11 @@ function Home() {
               </GridItem>
             </Grid>
           </GridItem>
-          <GridItem bgColor='black' colSpan={3} minHeight='67vh'>
-            <Heading>Modelo Luzio</Heading>
+          <GridItem colSpan={3} minHeight='67vh'>
+            
+            <div ref={mountRef} style={{ width: "100%", height: "100%" }}></div>
+          
           </GridItem>
-
         </Grid>
       </Stack>
 
